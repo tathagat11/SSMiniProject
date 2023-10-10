@@ -7,6 +7,18 @@
 #define PORT 8080
 #define MAX_BUFFER 1024
 
+void addnewstudent(int client_socket){
+    char newUsername[MAX_BUFFER];
+    char newPassword[] = "changeme";
+    char newRole[] = "student"; 
+    printf("Enter student username: ");
+    scanf("%s", newUsername);
+    send(client_socket, "newuser", sizeof("newuser"), 0);
+    send(client_socket, newUsername, sizeof(newUsername), 0);
+    send(client_socket, newPassword, sizeof(newPassword), 0);
+    send(client_socket, newRole, sizeof(newRole), 0);
+}
+
 int main() {
     int client_socket;
     struct sockaddr_in server_addr;
@@ -55,6 +67,49 @@ int main() {
     // Receive authentication result from the server
     recv(client_socket, buffer, sizeof(buffer), 0);
     printf("%s\n", buffer);
+    if(strcmp(buffer, "Authenticated") == 0){
+        int choice_num;
+        printf("Welcome %s!\n what would you like to do: \n", username);
+
+        //if admin
+        if(strcmp(role, "admin") == 0){
+            printf("1. Add new student.\n2. Add new faculty.\n3. Activate/Deactivate Student.\n4. Update Student/Faculty details.\n5. Exit.\n");
+            scanf("%d",&choice_num);
+            switch (choice_num){
+                case 1: addnewstudent(client_socket);
+                break;
+                case 2: break;
+                case 3: break;
+                case 4: break;
+                default: exit(0);
+            }
+        }
+        //if student
+
+        else if(strcmp(role, "student") == 0){
+            printf("1. Enroll to new course.\n2. Unenroll from a course.\n3. View enrolled courses.\n4. Change password.\n5. Exit.\n");
+            scanf("%d",&choice_num);
+            switch (choice_num){
+                case 1: break;
+                case 2: break;
+                case 3: break;
+                case 4: break;
+                default: exit(0);
+            }
+        }
+
+        else if(strcmp(role, "faculty") == 0){
+            printf("1. Add new course.\n2. Remove a course.\n3. View enrollments in courses.\n4. Change password.\n5. Exit.\n");
+            scanf("%d",&choice_num);
+            switch (choice_num){
+                case 1: break;
+                case 2: break;
+                case 3: break;
+                case 4: break;
+                default: exit(0);
+            }
+        }
+    }
 
     close(client_socket);
     return 0;
