@@ -85,7 +85,8 @@ int main() {
                     recv(client_socket, buffer, sizeof(buffer), 0);
                     printf("%s", buffer);
                 } break;
-                case 3: break;
+                case 3:{
+                } break;
                 case 4: break;
                 default: exit(0);
             }
