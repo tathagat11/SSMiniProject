@@ -4,6 +4,9 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #define PORT 8080
 #define MAX_BUFFER 1024
@@ -86,6 +89,7 @@ int main() {
     char username[MAX_BUFFER];
     char password[MAX_BUFFER];
     char role[MAX_BUFFER];
+    bool loggedin = false;
 
     recv(new_socket, username, sizeof(username), 0); // Receive username
     recv(new_socket, password, sizeof(password), 0); // Receive password
@@ -94,12 +98,63 @@ int main() {
     // Authenticate the user
     if (authenticate(users, num_users, username, password, role)) {
         send(new_socket, "Authenticated", sizeof("Authenticated"), 0);
+        loggedin = true;
     } else {
         send(new_socket, "Authentication failed", sizeof("Authentication failed"), 0);
     }
 
+    if(loggedin == true){
+        char choice[10];
+        recv(new_socket, &choice, sizeof(choice), 0);
+        int choice_num = atoi(choice);
+        //admin menu handler
+        if(strcmp(role, "admin") == 0){
+            switch(choice_num){
+                case 1: { //add new student
+                    char newUsername[512];
+                    recv(new_socket, newUsername, sizeof(newUsername), 0);
+                    int fd1 = open("users.txt", O_WRONLY | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
+                    if(fd1 < 0){
+                        perror("FD not opened at line 120!");
+                        exit(1);
+                    } else {
+                        char newStudent[MAX_BUFFER];
+                        sprintf(newStudent, "\n%s %s %s", newUsername, "changeme", "student");
+                        ssize_t ns_written = write(fd1, newStudent, strlen(newStudent));
+                        if(ns_written < 0){
+                            perror("Failed to add new student.");
+                            exit(1);
+                        } else {
+                            close(fd1);
+                            send(new_socket, "Student added successfully!\n", sizeof("Student added successfully!\n"), 0);
+                        }
+                    }
+                } break;
+                case 2: {
+                    char newUsername[512];
+                    recv(new_socket, newUsername, sizeof(newUsername), 0);
+                    int fd1 = open("users.txt", O_WRONLY | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
+                    if(fd1 < 0){
+                        perror("FD not opened at line 138!");
+                        exit(1);
+                    } else {
+                        char newFaculty[MAX_BUFFER];
+                        sprintf(newFaculty, "\n%s %s %s", newUsername, "changeme", "faculty");
+                        ssize_t nf_written = write(fd1, newFaculty, strlen(newFaculty));
+                        if(nf_written < 0){
+                            perror("Failed to add new faculty.");
+                            exit(1);
+                        } else {
+                            close(fd1);
+                            send(new_socket, "Faculty added successfully!\n", sizeof("Faculty added successfully!\n"), 0);
+                        }
+                    }
+                } break;
+                default: break;
+            }
+        }
+    }
     
-
     close(new_socket);
     close(server_socket);
     return 0;

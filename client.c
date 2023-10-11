@@ -7,17 +7,7 @@
 #define PORT 8080
 #define MAX_BUFFER 1024
 
-void addnewstudent(int client_socket){
-    char newUsername[MAX_BUFFER];
-    char newPassword[] = "changeme";
-    char newRole[] = "student"; 
-    printf("Enter student username: ");
-    scanf("%s", newUsername);
-    send(client_socket, "newuser", sizeof("newuser"), 0);
-    send(client_socket, newUsername, sizeof(newUsername), 0);
-    send(client_socket, newPassword, sizeof(newPassword), 0);
-    send(client_socket, newRole, sizeof(newRole), 0);
-}
+
 
 int main() {
     int client_socket;
@@ -73,12 +63,28 @@ int main() {
 
         //if admin
         if(strcmp(role, "admin") == 0){
-            printf("1. Add new student.\n2. Add new faculty.\n3. Activate/Deactivate Student.\n4. Update Student/Faculty details.\n5. Exit.\n");
+            printf("1. Add new student.\n2. Add new faculty.\n3. Deactivate Student/Faculty.\n4. Update Student/Faculty details.\n5. Exit.\n");
             scanf("%d",&choice_num);
+            char choice_arr[10];
+            sprintf(choice_arr,"%d", choice_num);
+            send(client_socket, choice_arr, sizeof(choice_arr), 0);
             switch (choice_num){
-                case 1: addnewstudent(client_socket);
-                break;
-                case 2: break;
+                case 1: {
+                    char newUsername[512];
+                    printf("Enter student username: ");
+                    scanf("%s", newUsername);
+                    send(client_socket, newUsername, sizeof(newUsername), 0);
+                    recv(client_socket, buffer, sizeof(buffer), 0);
+                    printf("%s", buffer);
+                } break;
+                case 2:{
+                    char newUsername[512];
+                    printf("Enter faculty username: ");
+                    scanf("%s", newUsername);
+                    send(client_socket, newUsername, sizeof(newUsername), 0);
+                    recv(client_socket, buffer, sizeof(buffer), 0);
+                    printf("%s", buffer);
+                } break;
                 case 3: break;
                 case 4: break;
                 default: exit(0);
@@ -101,6 +107,7 @@ int main() {
         else if(strcmp(role, "faculty") == 0){
             printf("1. Add new course.\n2. Remove a course.\n3. View enrollments in courses.\n4. Change password.\n5. Exit.\n");
             scanf("%d",&choice_num);
+            
             switch (choice_num){
                 case 1: break;
                 case 2: break;

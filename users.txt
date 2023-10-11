@@ -1,3 +1,5 @@
 u1 p1 admin
 u2 p2 student
 u3 p3 faculty
+tathagat10 changeme student
+user3 changeme faculty
