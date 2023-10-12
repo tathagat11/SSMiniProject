@@ -1,7 +1,3 @@
-u1 p1 admin
-u3 p3 faculty
-u2 p2 student
-tathagat10 changeme student
-
-u5 changeme student
-u6 changeme student
+u1 p1 admin -1 1
+u2 changeme student 1 1
+u10 changeme faculty -1 1

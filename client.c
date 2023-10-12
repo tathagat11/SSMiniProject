@@ -71,9 +71,13 @@ int main() {
             switch (choice_num){
                 case 1: {
                     char newUsername[512];
+                    char newRollno[10];
                     printf("Enter student username: ");
                     scanf("%s", newUsername);
+                    printf("Enter student roll number: ");
+                    scanf("%s", newRollno);
                     send(client_socket, newUsername, sizeof(newUsername), 0);
+                    send(client_socket, newRollno, sizeof(newRollno), 0);
                     recv(client_socket, buffer, sizeof(buffer), 0);
                     printf("%s", buffer);
                 } break;
