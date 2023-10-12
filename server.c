@@ -7,9 +7,11 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <pthread.h>
 
 #define PORT 8080
 #define MAX_BUFFER 1024
+#define MAX_STUDENTS 1024
 
 // User structure to store user data
 typedef struct {
@@ -17,6 +19,20 @@ typedef struct {
     char password[MAX_BUFFER];
     char role[MAX_BUFFER];
 } User;
+
+typedef struct {
+    char courseID[MAX_BUFFER];
+    char courseName[MAX_BUFFER];
+    char facultyName[MAX_BUFFER];
+    int numStudents;
+    char students[MAX_STUDENTS][MAX_BUFFER];
+} Course;
+
+typedef struct {
+    int new_socket;
+    User *users;
+    int* num_users;
+} ThreadData;
 
 bool authenticate(User* users, int num_users, char* username, char* password, char* role) {
     for (int i = 0; i < num_users; i++) {
@@ -29,63 +45,36 @@ bool authenticate(User* users, int num_users, char* username, char* password, ch
     return false; // Authentication failed
 }
 
-int main() {
-    int server_socket, new_socket;
-    struct sockaddr_in server_addr, new_addr;
-    socklen_t addr_size;
+void loadCourseData(Course courses[], int* numCourses) {
+    FILE* file = fopen("courses.txt", "r");
+    if (file == NULL) {
+        perror("Unable to open courses.txt");
+        exit(1);
+    }
+
     char buffer[MAX_BUFFER];
+    while (*numCourses < MAX_BUFFER && fgets(buffer, sizeof(buffer), file) != NULL) {
+        buffer[strcspn(buffer, "\n")] = '\0';  // Remove newline character
 
-    // Create socket
-    server_socket = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_socket < 0) {
-        perror("Socket creation error");
-        exit(1);
+        int parsedFields = sscanf(buffer, "%[^:]:%[^:]:%[^:]:%d:%[^\n]", courses[*numCourses].courseID,
+            courses[*numCourses].courseName, courses[*numCourses].facultyName,
+            &courses[*numCourses].numStudents, courses[*numCourses].students);
+
+        if (parsedFields == 5) {
+            (*numCourses)++;
+        }
     }
 
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(PORT);
-    server_addr.sin_addr.s_addr = INADDR_ANY;
+    fclose(file);
+}
 
-    // Bind the socket
-    if (bind(server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-        perror("Binding error");
-        exit(1);
-    }
-
-    // Listen for incoming connections
-    if (listen(server_socket, 10) == 0) {
-        printf("Listening...\n");
-    } else {
-        perror("Listening error");
-        exit(1);
-    }
-
-    addr_size = sizeof(new_addr);
-    new_socket = accept(server_socket, (struct sockaddr*)&new_addr, &addr_size); // Accept connection
-    if (new_socket < 0) {
-        perror("Acceptance error");
-        exit(1);
-    }
-
-    // Read user data from a file
-    FILE* user_file = fopen("users.txt", "r");
-    if (user_file == NULL) {
-        perror("User data file not found");
-        exit(1);
-    }
-
-    int num_users = 0;
-    User users[MAX_BUFFER];
-    char line[MAX_BUFFER];
-
-    while (fgets(line, sizeof(line), user_file) != NULL) {
-        sscanf(line, "%s %s %s", users[num_users].username, users[num_users].password, users[num_users].role);
-        num_users++;
-    }
-
-    fclose(user_file);
-
-    // Handle authentication
+// each separate client request is handled by this.
+void* handleClient(void* data){
+    ThreadData* thread_data = (ThreadData*)data;
+    int new_socket = thread_data->new_socket;
+    User *users = thread_data->users;
+    int num_users = *thread_data->num_users;
+    
     char username[MAX_BUFFER];
     char password[MAX_BUFFER];
     char role[MAX_BUFFER];
@@ -150,13 +139,137 @@ int main() {
                         }
                     }
                 } break;
+                case 3:{
+                    char delUsername[512];
+                    recv(new_socket, delUsername, sizeof(delUsername), 0);
+                    bool removed = false;
+                    int removeIndex;
+
+                    for(int i = 0; i < num_users; i++){
+                        if(strcmp(users[i].username, delUsername) == 0){
+                            removed = true;
+                            removeIndex = i;
+                            break;
+                        }
+                    }
+                    if(removed){
+                        for(int i = removeIndex; i < num_users - 1; i++){
+                            users[i] = users[i + 1];
+                        }
+                        num_users--;
+
+                        int fd2 = open("users.txt", O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+                        if(fd2 < 0){
+                            perror("Error opening users.txt line 131.");
+                            exit(1);
+                        } else {
+                            for(int i = 0; i < num_users; i++){
+                                char userData[MAX_BUFFER];
+                                sprintf(userData, "%s %s %s\n", users[i].username, users[i].password, users[i].role);
+
+                                ssize_t bytes_written = write(fd2, userData, strlen(userData));
+                                if(bytes_written < 0){
+                                    close(fd2);
+                                    perror("Error writing after deletion.");
+                                    exit(1);
+                                }
+                            }
+                            close(fd2);
+                            send(new_socket, "User removed successfully!", sizeof("User removed successfully!"), 0);
+                        }
+                    } else {
+                        send(new_socket, "User not found!", sizeof("User not found!"), 0);
+                    }
+                } break;
                 default: break;
             }
+        } 
+        // else if(strcmp(role, "student") == 0) {
+        //     //If logged in user is a student
+        //     Course courses[MAX_BUFFER];
+        //     int num_courses = 0;
+        //     loadCourseData(courses, &num_courses);
+        //     switch (choice_num)
+        //     {
+        //     case 1: { //enroll in a new course
+        //         printf("%d", num_courses);
+        //     }
+        //         break;
+            
+        //     default:  exit(0);
+        //         break;
+        //     }
+        // }
+    }
+
+    close(new_socket);
+    return NULL;
+}
+
+int main (){
+    int server_socket, new_socket;
+    struct sockaddr_in server_addr, new_addr;
+    socklen_t addr_size;
+    char buffer[MAX_BUFFER];
+
+    server_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if(server_socket < 0){
+        perror("Socket creation error");
+        exit(1);
+    }
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(PORT);
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+
+    if(bind(server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0){
+        perror("binding error");
+        exit(1);
+    }
+
+    if(listen(server_socket, 10) == 0){
+        printf("Listening...\n");
+    } else {
+        perror("Listening error!");
+        exit(1);
+    }
+
+    addr_size = sizeof(new_addr);
+
+    // Read user data from a file
+    FILE* user_file = fopen("users.txt", "r");
+    if (user_file == NULL) {
+        perror("User data file not found");
+        exit(1);
+    }
+
+    int num_users = 0;
+    User users[MAX_BUFFER];
+    char line[MAX_BUFFER];
+
+    while (fgets(line, sizeof(line), user_file) != NULL) {
+        sscanf(line, "%s %s %s", users[num_users].username, users[num_users].password, users[num_users].role);
+        num_users++;
+    }
+    fclose(user_file);
+    
+    while(1){
+        new_socket = accept(server_socket, (struct sockaddr*)&new_addr, &addr_size);
+        if(new_socket < 0){
+            perror("Acceptance error!");
+            exit(1);
+        }
+        pthread_t client_thread;
+        ThreadData thread_data;
+        thread_data.new_socket = new_socket;
+        thread_data.users = users;
+        thread_data.num_users = &num_users;
+
+
+        if(pthread_create(&client_thread, NULL, handleClient, &thread_data) != 0){
+            perror("Failed to create a new thread");
+            close(new_socket);
         }
     }
-    
-    close(new_socket);
     close(server_socket);
     return 0;
 }
-

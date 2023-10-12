@@ -6,6 +6,7 @@
 
 #define PORT 8080
 #define MAX_BUFFER 1024
+#define MAX_STUDENTS 1024
 
 
 
@@ -86,6 +87,12 @@ int main() {
                     printf("%s", buffer);
                 } break;
                 case 3:{
+                    char delUsername[512];
+                    printf("Enter username whose data you wish to delete: ");
+                    scanf("%s", delUsername);
+                    send(client_socket, delUsername, sizeof(delUsername), 0);
+                    recv(client_socket, buffer, sizeof(buffer), 0);
+                    printf("%s\n", buffer);
                 } break;
                 case 4: break;
                 default: exit(0);
