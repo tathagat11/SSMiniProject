@@ -61,10 +61,9 @@ int main() {
     if(strcmp(buffer, "Authenticated") == 0){
         int choice_num;
         printf("Welcome %s!\n what would you like to do: \n", username);
-
         //if admin
         if(strcmp(role, "admin") == 0){
-            printf("1. Add new student.\n2. Add new faculty.\n3. Deactivate Student/Faculty.\n4. Update Student/Faculty details.\n5. Exit.\n");
+            printf("1. Add new student.\n2. Add new faculty.\n3. Delete student/faculty.\n4. Update Student/Faculty details.\n5. Activate/deactivate student/faculty.\n5. Exit.\n");
             scanf("%d",&choice_num);
             char choice_arr[10];
             sprintf(choice_arr,"%d", choice_num);
