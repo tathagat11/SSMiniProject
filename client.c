@@ -63,7 +63,7 @@ int main() {
         printf("Welcome %s!\n what would you like to do: \n", username);
         //if admin
         if(strcmp(role, "admin") == 0){
-            printf("1. Add new student.\n2. Add new faculty.\n3. Delete student/faculty.\n4. Update Student/Faculty details.\n5. Activate/deactivate student/faculty.\n5. Exit.\n");
+            printf("1. Add new student.\n2. Add new faculty.\n3. Delete student/faculty.\n4. Update Student/Faculty details.\n5. Activate/deactivate student/faculty.\n6. Exit.\n");
             scanf("%d",&choice_num);
             char choice_arr[10];
             sprintf(choice_arr,"%d", choice_num);
@@ -97,8 +97,30 @@ int main() {
                     recv(client_socket, buffer, sizeof(buffer), 0);
                     printf("%s\n", buffer);
                 } break;
-                case 4: break;
+                case 4: {
+                    char oldUsername[512];
+                    char newUsername[512];
+                    printf("Enter the old username: ");
+                    scanf("%s", oldUsername);
+                    printf("Enter the new username: ");
+                    scanf("%s", newUsername);
+                    send(client_socket, oldUsername, sizeof(oldUsername), 0);
+                    send(client_socket, newUsername, sizeof(newUsername), 0);
+                    recv(client_socket, buffer, sizeof(buffer), 0);
+                    printf("%s\n", buffer);
+                } break;
+                case 5: {
+                    char username[512];
+                    printf("Enter the username to activate/deactivate: ");
+                    scanf("%s", username);
+                    send(client_socket, username, sizeof(username), 0);
+                    recv(client_socket, buffer, sizeof(buffer), 0);
+                    printf("%s\n", buffer);
+                } break;
+                case 6: exit(0);
+                break;
                 default: exit(0);
+                break;
             }
         }
         //if student

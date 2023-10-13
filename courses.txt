@@ -1,1 +1,2 @@
-AI511:Maths for Machine Learning:u3:u2,tathagat10
+AI511:Maths for Machine Learning:u10:1,2,3
+CS123:Software Systems:u10:1,2,4

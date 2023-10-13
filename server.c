@@ -12,6 +12,7 @@
 #define PORT 8080
 #define MAX_BUFFER 1024
 #define MAX_STUDENTS 1024
+#define MAX_COURSES 1024
 
 // User structure to store user data
 typedef struct {
@@ -50,31 +51,123 @@ bool authenticate(User* users, int num_users, char* username, char* password, ch
     return false; // Authentication failed
 }
 
+//function to load courses data.
+int loadCourseData(Course courses[], int max_courses) {
+    int fd = open("courses.txt", O_RDONLY);
+    if (fd == -1) {
+        perror("Course data file not found");
+        return -1;
+    }
+
+    int numCourses = 0;
+    char buffer[MAX_BUFFER];
+    char c;
+    int buffer_index = 0;
+
+    while (numCourses < max_courses && read(fd, &c, 1) > 0) {
+        if (c != '\n') {
+            // Append the character to the buffer
+            buffer[buffer_index++] = c;
+        } else {
+            // Null-terminate the buffer to ensure sscanf works correctly
+            buffer[buffer_index] = '\0';
+
+            // Parse the line
+            char *token = strtok(buffer, ":");
+            if (token != NULL) {
+                strncpy(courses[numCourses].courseID, token, sizeof(courses[numCourses].courseID));
+            }
+
+            token = strtok(NULL, ":");
+            if (token != NULL) {
+                strncpy(courses[numCourses].courseName, token, sizeof(courses[numCourses].courseName));
+            }
+
+            token = strtok(NULL, ":");
+            if (token != NULL) {
+                strncpy(courses[numCourses].facultyName, token, sizeof(courses[numCourses].facultyName));
+            }
+
+            token = strtok(NULL, ":");
+            if (token != NULL) {
+                courses[numCourses].numStudents = atoi(token);
+            }
+
+            token = strtok(NULL, ":");
+            if (token != NULL) {
+                // Tokenize the list of students
+                int studentIndex = 0;
+                char *student = strtok(token, ",");
+                while (student != NULL && studentIndex < MAX_STUDENTS) {
+                    strncpy(courses[numCourses].students[studentIndex], student, sizeof(courses[numCourses].students[studentIndex]));
+                    studentIndex++;
+                    student = strtok(NULL, ",");
+                }
+            }
+
+            // Reset the buffer
+            buffer_index = 0;
+            numCourses++;
+        }
+    }
+
+    close(fd);
+    return numCourses;
+}
+
+//function to read users data.
+int readUserFile(User users[], int max_users) {
+    int fd = open("users.txt", O_RDONLY);
+    if (fd == -1) {
+        perror("Error opening user data file");
+        return -1;
+    }
+
+    int num_users = 0;
+    char buffer[MAX_BUFFER];
+    char c;
+    int buffer_index = 0;
+
+    while (num_users < max_users && read(fd, &c, 1) > 0) {
+        if (c != '\n') {
+            // Append the character to the buffer
+            buffer[buffer_index++] = c;
+        } else {
+            // Null-terminate the buffer to ensure sscanf works correctly
+            buffer[buffer_index] = '\0';
+
+            // Parse the line
+            char activated[1];
+            sscanf(buffer, "%s %s %s %s %s",
+                   users[num_users].username, users[num_users].password,
+                   users[num_users].role, users[num_users].rollno, activated);
+            if (strcmp(activated, "1") == 0) users[num_users].activated = 1;
+            else users[num_users].activated = 0;
+
+            // Reset the buffer
+            buffer_index = 0;
+            num_users++;
+        }
+    }
+
+    close(fd);
+    return num_users;
+}
+
 
 
 // each separate client request is handled by this.
 void* handleClient(void* data){
-    FILE* user_file = fopen("users.txt", "r");
-    if (user_file == NULL) {
-        perror("User data file not found");
+
+    ThreadData* thread_data = (ThreadData*)data;
+    int new_socket = thread_data->new_socket;
+
+    User users[MAX_BUFFER];
+    int num_users = readUserFile(users, MAX_BUFFER);
+    if (num_users <= 0) {
         exit(1);
     }
 
-    int num_users = 0;
-    User users[MAX_BUFFER];
-    char line[MAX_BUFFER];
-
-    while (fgets(line, sizeof(line), user_file) != NULL) {
-        char activated[1];
-        sscanf(line, "%s %s %s %s %s", users[num_users].username, users[num_users].password, users[num_users].role, users[num_users].rollno, activated);
-        if(strcmp(activated, "1") == 0) users[num_users].activated = 1;
-        else users[num_users].activated = 0;
-        num_users++;
-    }
-    fclose(user_file);
-    ThreadData* thread_data = (ThreadData*)data;
-    int new_socket = thread_data->new_socket;
-    
     char username[MAX_BUFFER];
     char password[MAX_BUFFER];
     char role[MAX_BUFFER];
@@ -171,33 +264,103 @@ void* handleClient(void* data){
                             break;
                         }
                     }
-                    
-                    if (removed) {
-                        for (int i = removeIndex; i < num_users - 1; i++) {
-                            users[i] = users[i + 1];
-                        }
-                        num_users--;
 
-                        // Reopen "users.txt" to overwrite it with updated data
-                        FILE* user_file = fopen("users.txt", "w");
-                        if (user_file == NULL) {
+                    if (removed) {
+                        // Open the file using open system call
+                        int fd = open("users.txt", O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+                        if (fd < 0) {
                             perror("Error opening users.txt for writing");
                             exit(1);
                         }
 
+                        // Write all users except the one to be removed
                         for (int i = 0; i < num_users; i++) {
-                            char activated[2];
-                            if (users[i].activated == 0) {
-                                strcpy(activated, "0");
-                            } else {
-                                strcpy(activated, "1");
+                            if (i != removeIndex) {
+                                char activated = users[i].activated ? '1' : '0';
+                                dprintf(fd, "%s %s %s %s %c\n", users[i].username, users[i].password, users[i].role, users[i].rollno, activated);
                             }
-                            fprintf(user_file, "%s %s %s %s %s\n", users[i].username, users[i].password, users[i].role, users[i].rollno, activated);
                         }
 
-                        fclose(user_file);
+                        close(fd);
+
                         send(new_socket, "User removed successfully!", sizeof("User removed successfully!"), 0);
                     } else {
+                        send(new_socket, "User not found!", sizeof("User not found!"), 0);
+                    }
+                } break;
+
+
+                case 4: {
+                    char oldUsername[512];
+                    char newUsername[512];
+                    recv(new_socket, oldUsername, sizeof(oldUsername), 0);
+                    recv(new_socket, newUsername, sizeof(newUsername), 0);
+
+                    for (int i = 0; i < num_users; i++) {
+                        if (strcmp(users[i].username, oldUsername) == 0) {
+                            strcpy(users[i].username, newUsername);
+
+                            // Update the users.txt file
+                            FILE* user_file = fopen("users.txt", "w");
+                            if (user_file == NULL) {
+                                perror("Error opening users.txt for writing");
+                                exit(1);
+                            }
+                            for (int j = 0; j < num_users; j++) {
+                                char activated[2];
+                                if (users[j].activated == 0) {
+                                    strcpy(activated, "0");
+                                } else {
+                                    strcpy(activated, "1");
+                                }
+                                fprintf(user_file, "%s %s %s %s %s\n", users[j].username, users[j].password, users[j].role, users[j].rollno, activated);
+                            }
+                            fclose(user_file);
+
+                            send(new_socket, "Username modified successfully!", sizeof("Username modified successfully!"), 0);
+                            break;
+                        }
+                    }
+                    send(new_socket, "User not found!", sizeof("User not found!"), 0);                    
+                } break;
+                case 5: {
+                    char username[512];
+                    recv(new_socket, username, sizeof(username), 0);
+
+                    int found = 0;
+                    for (int i = 0; i < num_users; i++) {
+                        if (strcmp(users[i].username, username) == 0) {
+                            found = 1;
+                            users[i].activated = !users[i].activated;
+
+                            // Update the users.txt file
+                            FILE* user_file = fopen("users.txt", "w");
+                            if (user_file == NULL) {
+                                perror("Error opening users.txt for writing");
+                                exit(1);
+                            }
+                            for (int j = 0; j < num_users; j++) {
+                                char activated[2];
+                                if (users[j].activated == 0) {
+                                    strcpy(activated, "0");
+                                } else {
+                                    strcpy(activated, "1");
+                                }
+                                fprintf(user_file, "%s %s %s %s %s\n", users[j].username, users[j].password, users[j].role, users[j].rollno, activated);
+                            }
+                            fclose(user_file);
+
+                            char response[MAX_BUFFER];
+                            if (users[i].activated) {
+                                sprintf(response, "User '%s' activated successfully!", username);
+                            } else {
+                                sprintf(response, "User '%s' deactivated successfully!", username);
+                            }
+                            send(new_socket, response, sizeof(response), 0);
+                            break;
+                        }
+                    }
+                    if (!found) {
                         send(new_socket, "User not found!", sizeof("User not found!"), 0);
                     }
                 } break;
