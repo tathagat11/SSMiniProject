@@ -93,12 +93,50 @@ bool authenticate(User* users, int num_users, char* username, char* password, ch
 //     return numCourses;
 // }
 
+// Lock the file for reading
+int lockFileForReading(int fd) {
+    struct flock lock;
+    memset(&lock, 0, sizeof(lock));
+    lock.l_type = F_RDLCK; 
+    lock.l_whence = SEEK_SET;
+    lock.l_start = 0;
+    lock.l_len = 0;
+
+    return fcntl(fd, F_SETLK, &lock);
+}
+
+// Lock the file for writing
+int lockFileForWriting(int fd) {
+    struct flock lock;
+    memset(&lock, 0, sizeof(lock));
+    lock.l_type = F_WRLCK; 
+    lock.l_whence = SEEK_SET;
+    lock.l_start = 0;
+    lock.l_len = 0;
+
+    return fcntl(fd, F_SETLK, &lock);
+}
+
+// Unlock the file
+int unlockFile(int fd) {
+    struct flock lock;
+    memset(&lock, 0, sizeof(lock));
+    lock.l_type = F_UNLCK;
+
+    return fcntl(fd, F_SETLK, &lock);
+}
 
 //function to read users data.
 int readUserFile(User users[], int max_users) {
     int fd = open("users.txt", O_RDONLY);
     if (fd == -1) {
         perror("Error opening user data file");
+        exit(1);
+    }
+
+    if (lockFileForReading(fd) == -1) {
+        perror("Error acquiring read lock on file");
+        close(fd);
         return -1;
     }
 
@@ -126,11 +164,10 @@ int readUserFile(User users[], int max_users) {
         }
     }
 
+    unlockFile(fd);
     close(fd);
     return num_users;
 }
-
-
 
 // each separate client request is handled by this.
 void* handleClient(void* data){
@@ -189,9 +226,17 @@ void* handleClient(void* data){
                         perror("FD not opened at line 120!");
                         exit(1);
                     } else {
+                        if (lockFileForWriting(fd1) == -1) {
+                            perror("Error acquiring write lock on file");
+                            close(fd1);
+                            exit(1);
+                        }
                         char newStudent[MAX_BUFFER];
                         sprintf(newStudent, "%s %s %s %s %s\n", newUsername, "changeme", "student", newRollno, "1");
                         ssize_t ns_written = write(fd1, newStudent, strlen(newStudent));
+                        
+                        unlockFile(fd1);
+
                         if(ns_written < 0){
                             perror("Failed to add new student.");
                             exit(1);
@@ -217,9 +262,19 @@ void* handleClient(void* data){
                         perror("FD not opened at line 138!");
                         exit(1);
                     } else {
+                        
+                        if (lockFileForWriting(fd1) == -1) {
+                            perror("Error acquiring write lock on file");
+                            close(fd1);
+                            exit(1);
+                        }
+
                         char newFaculty[MAX_BUFFER];
                         sprintf(newFaculty, "%s %s %s %s %s\n", newUsername, "changeme", "faculty", "-1", "1");
                         ssize_t nf_written = write(fd1, newFaculty, strlen(newFaculty));
+                        
+                        unlockFile(fd1);
+
                         if(nf_written < 0){
                             perror("Failed to add new faculty.");
                             exit(1);
@@ -249,13 +304,21 @@ void* handleClient(void* data){
                             perror("Error opening users.txt for writing");
                             exit(1);
                         }
-                        
+
+                        if (lockFileForWriting(fd) == -1) {
+                            perror("Error acquiring write lock on file");
+                            close(fd);
+                            exit(1);
+                        }
+
                         for (int i = 0; i < num_users; i++) {
                             if (i != removeIndex) {
                                 char activated = users[i].activated ? '1' : '0';
                                 dprintf(fd, "%s %s %s %s %c\n", users[i].username, users[i].password, users[i].role, users[i].rollno, activated);
                             }
                         }
+
+                        unlockFile(fd);
 
                         close(fd);
 
@@ -265,66 +328,85 @@ void* handleClient(void* data){
                     }
                 } break;
 
-
-                case 4: {
+                case 4: { // Modify username
                     char oldUsername[512];
                     char newUsername[512];
                     recv(new_socket, oldUsername, sizeof(oldUsername), 0);
                     recv(new_socket, newUsername, sizeof(newUsername), 0);
 
+                    int fd = open("users.txt", O_RDWR);
+                    if (fd < 0) {
+                        perror("Error opening users.txt for reading and writing");
+                        exit(1);
+                    }
+
+                    if (lockFileForWriting(fd) == -1) {
+                        perror("Error acquiring write lock on file");
+                        close(fd);
+                        exit(1);
+                    }
+
+                    int found = 0;
                     for (int i = 0; i < num_users; i++) {
                         if (strcmp(users[i].username, oldUsername) == 0) {
+                            found = 1;
                             strcpy(users[i].username, newUsername);
-
-                            // Update the users.txt file
-                            FILE* user_file = fopen("users.txt", "w");
-                            if (user_file == NULL) {
-                                perror("Error opening users.txt for writing");
-                                exit(1);
-                            }
-                            for (int j = 0; j < num_users; j++) {
-                                char activated[2];
-                                if (users[j].activated == 0) {
-                                    strcpy(activated, "0");
-                                } else {
-                                    strcpy(activated, "1");
-                                }
-                                fprintf(user_file, "%s %s %s %s %s\n", users[j].username, users[j].password, users[j].role, users[j].rollno, activated);
-                            }
-                            fclose(user_file);
-
-                            send(new_socket, "Username modified successfully!", sizeof("Username modified successfully!"), 0);
                             break;
                         }
                     }
-                    send(new_socket, "User not found!", sizeof("User not found!"), 0);                    
+
+                    if (found) {
+                        if (ftruncate(fd, 0) == -1) {
+                            perror("Error clearing the users.txt file");
+                            unlockFile(fd);
+                            close(fd);
+                            exit(1);
+                        }
+                        lseek(fd, 0, SEEK_SET);
+                        
+                        for (int j = 0; j < num_users; j++) {
+                            char activated = users[j].activated ? '1' : '0';
+                            dprintf(fd, "%s %s %s %s %c\n", users[j].username, users[j].password, users[j].role, users[j].rollno, activated);
+                        }
+
+                        unlockFile(fd);
+
+                        send(new_socket, "Username modified successfully!", sizeof("Username modified successfully!"), 0);
+                        close(fd);
+                    } else {
+                        unlockFile(fd);
+                        close(fd);
+                        send(new_socket, "User not found!", sizeof("User not found!"), 0);
+                    }
                 } break;
+
                 case 5: {
                     char username[512];
                     recv(new_socket, username, sizeof(username), 0);
 
                     int found = 0;
+                    int fd = open("users.txt", O_RDWR);
+                    if (fd < 0) {
+                        perror("Error opening users.txt for writing");
+                        exit(1);
+                    }
+
+                    if (lockFileForWriting(fd) == -1) {
+                        perror("Error locking the file");
+                        close(fd);
+                        exit(1);
+                    }
+
                     for (int i = 0; i < num_users; i++) {
                         if (strcmp(users[i].username, username) == 0) {
                             found = 1;
                             users[i].activated = !users[i].activated;
+                            lseek(fd, 0, SEEK_SET); // Move the file pointer to the beginning
 
-                            // Update the users.txt file
-                            FILE* user_file = fopen("users.txt", "w");
-                            if (user_file == NULL) {
-                                perror("Error opening users.txt for writing");
-                                exit(1);
-                            }
                             for (int j = 0; j < num_users; j++) {
-                                char activated[2];
-                                if (users[j].activated == 0) {
-                                    strcpy(activated, "0");
-                                } else {
-                                    strcpy(activated, "1");
-                                }
-                                fprintf(user_file, "%s %s %s %s %s\n", users[j].username, users[j].password, users[j].role, users[j].rollno, activated);
+                                char activated = users[j].activated ? '1' : '0';
+                                dprintf(fd, "%s %s %s %s %c\n", users[j].username, users[j].password, users[j].role, users[j].rollno, activated);
                             }
-                            fclose(user_file);
 
                             char response[MAX_BUFFER];
                             if (users[i].activated) {
@@ -336,10 +418,15 @@ void* handleClient(void* data){
                             break;
                         }
                     }
+
                     if (!found) {
                         send(new_socket, "User not found!", sizeof("User not found!"), 0);
                     }
+
+                    unlockFile(fd); // Unlock the file
+                    close(fd);
                 } break;
+
                 default: break;
             }
         } 
