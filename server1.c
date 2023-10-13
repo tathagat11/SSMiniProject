@@ -19,7 +19,7 @@ typedef struct {
     char username[MAX_BUFFER];
     char password[MAX_BUFFER];
     char role[MAX_BUFFER];
-    char rollno[5];
+    char rollno[10];
     bool activated;
 } User;
 
@@ -52,68 +52,47 @@ bool authenticate(User* users, int num_users, char* username, char* password, ch
 }
 
 //function to load courses data.
-int loadCourseData(Course courses[], int max_courses) {
-    int fd = open("courses.txt", O_RDONLY);
-    if (fd == -1) {
-        perror("Course data file not found");
-        return -1;
-    }
+// int loadCourseData(Course courses[], int max_courses) {
+//     int fd = open("courses.txt", O_RDONLY);
+//     if (fd == -1) {
+//         perror("Course data file not found");
+//         return -1;
+//     }
 
-    int numCourses = 0;
-    char buffer[MAX_BUFFER];
-    char c;
-    int buffer_index = 0;
+//     char buffer[MAX_BUFFER];
+//     int numCourses = 0;
 
-    while (numCourses < max_courses && read(fd, &c, 1) > 0) {
-        if (c != '\n') {
-            // Append the character to the buffer
-            buffer[buffer_index++] = c;
-        } else {
-            // Null-terminate the buffer to ensure sscanf works correctly
-            buffer[buffer_index] = '\0';
+//     while (numCourses < max_courses) {
+//         ssize_t bytes_read = read(fd, buffer, sizeof(buffer));
+//         if (bytes_read <= 0) {
+//             break; // Reached end of file
+//         }
 
-            // Parse the line
-            char *token = strtok(buffer, ":");
-            if (token != NULL) {
-                strncpy(courses[numCourses].courseID, token, sizeof(courses[numCourses].courseID));
-            }
+//         buffer[bytes_read] = '\0'; // Null-terminate the buffer
+//         char *token = strtok(buffer, "\n");
 
-            token = strtok(NULL, ":");
-            if (token != NULL) {
-                strncpy(courses[numCourses].courseName, token, sizeof(courses[numCourses].courseName));
-            }
+//         if (token != NULL) {
+//             // Parse the line
+//             sscanf(token, "%[^:]:%[^:]:%[^:]:%[^\n]", courses[numCourses].courseID, courses[numCourses].courseName, courses[numCourses].facultyName, buffer);
+//             courses[numCourses].numStudents = 0;
 
-            token = strtok(NULL, ":");
-            if (token != NULL) {
-                strncpy(courses[numCourses].facultyName, token, sizeof(courses[numCourses].facultyName));
-            }
+//             char *student = strtok(buffer, ",");
+//             int studentIndex = 0;
+//             while (student != NULL && studentIndex < MAX_STUDENTS) {
+//                 strncpy(courses[numCourses].students[studentIndex], student, sizeof(courses[numCourses].students[studentIndex]));
+//                 studentIndex++;
+//                 courses[numCourses].numStudents++;
+//                 student = strtok(NULL, ",");
+//             }
 
-            token = strtok(NULL, ":");
-            if (token != NULL) {
-                courses[numCourses].numStudents = atoi(token);
-            }
+//             numCourses++;
+//         }
+//     }
 
-            token = strtok(NULL, ":");
-            if (token != NULL) {
-                // Tokenize the list of students
-                int studentIndex = 0;
-                char *student = strtok(token, ",");
-                while (student != NULL && studentIndex < MAX_STUDENTS) {
-                    strncpy(courses[numCourses].students[studentIndex], student, sizeof(courses[numCourses].students[studentIndex]));
-                    studentIndex++;
-                    student = strtok(NULL, ",");
-                }
-            }
+//     close(fd);
+//     return numCourses;
+// }
 
-            // Reset the buffer
-            buffer_index = 0;
-            numCourses++;
-        }
-    }
-
-    close(fd);
-    return numCourses;
-}
 
 //function to read users data.
 int readUserFile(User users[], int max_users) {
@@ -130,13 +109,11 @@ int readUserFile(User users[], int max_users) {
 
     while (num_users < max_users && read(fd, &c, 1) > 0) {
         if (c != '\n') {
-            // Append the character to the buffer
             buffer[buffer_index++] = c;
         } else {
-            // Null-terminate the buffer to ensure sscanf works correctly
+
             buffer[buffer_index] = '\0';
 
-            // Parse the line
             char activated[1];
             sscanf(buffer, "%s %s %s %s %s",
                    users[num_users].username, users[num_users].password,
@@ -144,7 +121,6 @@ int readUserFile(User users[], int max_users) {
             if (strcmp(activated, "1") == 0) users[num_users].activated = 1;
             else users[num_users].activated = 0;
 
-            // Reset the buffer
             buffer_index = 0;
             num_users++;
         }
@@ -167,10 +143,8 @@ void* handleClient(void* data){
     if (num_users <= 0) {
         exit(1);
     }
-
-    Course courses[MAX_COURSES];
-    int num_courses;
-    
+    // Course courses[MAX_BUFFER];
+    // int num_courses = loadCourseData(courses, MAX_BUFFER);
 
     char username[MAX_BUFFER];
     char password[MAX_BUFFER];
@@ -270,14 +244,12 @@ void* handleClient(void* data){
                     }
 
                     if (removed) {
-                        // Open the file using open system call
                         int fd = open("users.txt", O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
                         if (fd < 0) {
                             perror("Error opening users.txt for writing");
                             exit(1);
                         }
-
-                        // Write all users except the one to be removed
+                        
                         for (int i = 0; i < num_users; i++) {
                             if (i != removeIndex) {
                                 char activated = users[i].activated ? '1' : '0';
@@ -371,22 +343,6 @@ void* handleClient(void* data){
                 default: break;
             }
         } 
-        // else if(strcmp(role, "student") == 0) {
-        //     //If logged in user is a student
-        //     Course courses[MAX_BUFFER];
-        //     int num_courses = 0;
-        //     loadCourseData(courses, &num_courses);
-        //     switch (choice_num)
-        //     {
-        //     case 1: { //enroll in a new course
-        //         printf("%d", num_courses);
-        //     }
-        //         break;
-            
-        //     default:  exit(0);
-        //         break;
-        //     }
-        // }
     }
 
     close(new_socket);
