@@ -34,12 +34,14 @@ int main() {
     char username[MAX_BUFFER];
     char password[MAX_BUFFER];
     char role[MAX_BUFFER];
-
+    printf("================================ Welcome to Academia =============================\n\n");
+    printf("---> Please login, or contact an admin to sign up.\n\n");
     printf("Enter username: ");
     scanf("%s", username);
     printf("Enter password: ");
     scanf("%s", password);
-    printf("Enter number corresponding to your role:\n1. Student\n2. Faculty\n3. Administrator\n");
+    printf("\nEnter number corresponding to your role:\n1. Student\n2. Faculty\n3. Administrator\n");
+    printf("Your Choice: ");
     scanf("%d", &role_n);
     switch(role_n){
         case 1: strcpy(role, "student");
@@ -57,13 +59,15 @@ int main() {
 
     // Receive authentication result from the server
     recv(client_socket, buffer, sizeof(buffer), 0);
-    printf("%s\n", buffer);
+    printf("%s\n\n", buffer);
     if(strcmp(buffer, "Authenticated") == 0){
+        printf("=====================================================================================\n\n");
         int choice_num;
-        printf("Welcome %s!\n what would you like to do: \n", username);
+        printf("Welcome %s! What would you like to do: \n", username);
         //if admin
         if(strcmp(role, "admin") == 0){
             printf("1. Add new student.\n2. Add new faculty.\n3. Delete student/faculty.\n4. Update Student/Faculty details.\n5. Activate/deactivate student/faculty.\n6. Exit.\n");
+            printf("Your choice: ");
             scanf("%d",&choice_num);
             char choice_arr[10];
             sprintf(choice_arr,"%d", choice_num);
@@ -72,7 +76,7 @@ int main() {
                 case 1: {
                     char newUsername[512];
                     char newRollno[10];
-                    printf("Enter student username: ");
+                    printf("\nEnter student username: ");
                     scanf("%s", newUsername);
                     printf("Enter student roll number: ");
                     scanf("%s", newRollno);
@@ -83,7 +87,7 @@ int main() {
                 } break;
                 case 2:{
                     char newUsername[512];
-                    printf("Enter faculty username: ");
+                    printf("\nEnter faculty username: ");
                     scanf("%s", newUsername);
                     send(client_socket, newUsername, sizeof(newUsername), 0);
                     recv(client_socket, buffer, sizeof(buffer), 0);
@@ -91,7 +95,7 @@ int main() {
                 } break;
                 case 3:{
                     char delUsername[512];
-                    printf("Enter username whose data you wish to delete: ");
+                    printf("\nEnter username whose data you wish to delete: ");
                     scanf("%s", delUsername);
                     send(client_socket, delUsername, sizeof(delUsername), 0);
                     recv(client_socket, buffer, sizeof(buffer), 0);
@@ -100,7 +104,7 @@ int main() {
                 case 4: {
                     char oldUsername[512];
                     char newUsername[512];
-                    printf("Enter the old username: ");
+                    printf("\nEnter the old username: ");
                     scanf("%s", oldUsername);
                     printf("Enter the new username: ");
                     scanf("%s", newUsername);
@@ -111,7 +115,7 @@ int main() {
                 } break;
                 case 5: {
                     char username[512];
-                    printf("Enter the username to activate/deactivate: ");
+                    printf("\nEnter the username to activate/deactivate: ");
                     scanf("%s", username);
                     send(client_socket, username, sizeof(username), 0);
                     recv(client_socket, buffer, sizeof(buffer), 0);

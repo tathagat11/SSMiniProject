@@ -4,5 +4,6 @@ u10 p10 faculty -1 1
 u48 changeme student 3 1
 u23 changeme faculty -1 1
 u29 changeme student 120 1
-u20 changeme student 123 1
+u20 changeme student 123 0
 u78 p78 faculty -1 1
+u29 changeme student 23 1
