@@ -51,48 +51,6 @@ bool authenticate(User* users, int num_users, char* username, char* password, ch
     return false; // Authentication failed
 }
 
-//function to load courses data.
-// int loadCourseData(Course courses[], int max_courses) {
-//     int fd = open("courses.txt", O_RDONLY);
-//     if (fd == -1) {
-//         perror("Course data file not found");
-//         return -1;
-//     }
-
-//     char buffer[MAX_BUFFER];
-//     int numCourses = 0;
-
-//     while (numCourses < max_courses) {
-//         ssize_t bytes_read = read(fd, buffer, sizeof(buffer));
-//         if (bytes_read <= 0) {
-//             break; // Reached end of file
-//         }
-
-//         buffer[bytes_read] = '\0'; // Null-terminate the buffer
-//         char *token = strtok(buffer, "\n");
-
-//         if (token != NULL) {
-//             // Parse the line
-//             sscanf(token, "%[^:]:%[^:]:%[^:]:%[^\n]", courses[numCourses].courseID, courses[numCourses].courseName, courses[numCourses].facultyName, buffer);
-//             courses[numCourses].numStudents = 0;
-
-//             char *student = strtok(buffer, ",");
-//             int studentIndex = 0;
-//             while (student != NULL && studentIndex < MAX_STUDENTS) {
-//                 strncpy(courses[numCourses].students[studentIndex], student, sizeof(courses[numCourses].students[studentIndex]));
-//                 studentIndex++;
-//                 courses[numCourses].numStudents++;
-//                 student = strtok(NULL, ",");
-//             }
-
-//             numCourses++;
-//         }
-//     }
-
-//     close(fd);
-//     return numCourses;
-// }
-
 // Lock the file for reading
 int lockFileForReading(int fd) {
     struct flock lock;
@@ -126,6 +84,65 @@ int unlockFile(int fd) {
     return fcntl(fd, F_SETLK, &lock);
 }
 
+int loadCourseData(Course courses[], int max_courses) {
+    int fd = open("courses.txt", O_RDONLY);
+    if (fd == -1) {
+        perror("Course data file not found");
+        return -1;
+    }
+
+    int numCourses = 0;
+    char buffer[MAX_BUFFER];
+    char c;
+    int buffer_index = 0;
+
+    while (numCourses < max_courses && read(fd, &c, 1) > 0) {
+        if (c != '\n') {
+            buffer[buffer_index++] = c;
+        } else {
+      buffer[buffer_index] = '\0';
+
+            // Parse the line
+            char *token = strtok(buffer, ":");
+            if (token != NULL) {
+                strncpy(courses[numCourses].courseID, token, sizeof(courses[numCourses].courseID));
+            }
+
+            token = strtok(NULL, ":");
+            if (token != NULL) {
+                strncpy(courses[numCourses].courseName, token, sizeof(courses[numCourses].courseName));
+            }
+
+            token = strtok(NULL, ":");
+            if (token != NULL) {
+                strncpy(courses[numCourses].facultyName, token, sizeof(courses[numCourses].facultyName));
+            }
+
+            token = strtok(NULL, ":");
+            if (token != NULL) {
+                courses[numCourses].numStudents = atoi(token);
+            }
+
+            token = strtok(NULL, ":");
+            if (token != NULL) {
+                // Tokenize the list of students
+                int studentIndex = 0;
+                char *student = strtok(token, ",");
+                while (student != NULL && studentIndex < 10) {
+                    strcpy(courses[numCourses].students[studentIndex], student);
+                    studentIndex++;
+                    student = strtok(NULL, ",");
+                }
+            }
+
+            buffer_index = 0;
+            numCourses++;
+        }
+    }
+
+    close(fd);
+    return numCourses;
+}
 //function to read users data.
 int readUserFile(User users[], int max_users) {
     int fd = open("users.txt", O_RDONLY);
@@ -180,6 +197,7 @@ void* handleClient(void* data){
     if (num_users <= 0) {
         exit(1);
     }
+
     // Course courses[MAX_BUFFER];
     // int num_courses = loadCourseData(courses, MAX_BUFFER);
 
@@ -427,11 +445,45 @@ void* handleClient(void* data){
                     close(fd);
                 } break;
 
+                case 6: {
+                    char viewUsername[MAX_BUFFER];
+                    bool found = false;
+                    recv(new_socket, viewUsername, sizeof(viewUsername), 0);
+                    for(int i = 0; i < num_users; i++){
+                        if(strcmp(users[i].username, viewUsername) == 0){
+                            char printData[MAX_BUFFER];
+                            sprintf(printData, "Here is the data you requested about %s.\n\nRole: %s\nPassword: %s\n", users[i].username, users[i].role, users[i].password);
+                            if(strcmp(users[i].role, "faculty") == 0){
+                                if(users[i].activated){
+                                    strcat(printData, "Activation status: Activated\n");
+                                } else {
+                                    strcat(printData, "Activation status: Deactivated\n");
+                                }
+                            } else if(strcmp(users[i].role, "student") == 0){
+                                strcat(printData, "Roll no: ");
+                                strcat(printData, users[i].rollno);
+                                strcat(printData, "\n");
+                                if(users[i].activated){
+                                    strcat(printData, "Activation status: Activated\n");
+                                } else {
+                                    strcat(printData, "Activation status: Deactivated\n");
+                                }
+                            }
+                            send(new_socket, printData, sizeof(printData), 0);
+                            found = true;
+                            break;
+                        }
+                    }
+                    if(found == false){
+                        send(new_socket, "User not found.\n", sizeof("User not found.\n"), 0);
+                    }
+                }   break;
+
                 default: break;
             }
         } 
     }
-
+    // num_users = readUserFile(users, MAX_BUFFER);
     close(new_socket);
     return NULL;
 }

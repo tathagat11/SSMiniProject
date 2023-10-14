@@ -66,7 +66,7 @@ int main() {
         printf("Welcome %s! What would you like to do: \n", username);
         //if admin
         if(strcmp(role, "admin") == 0){
-            printf("1. Add new student.\n2. Add new faculty.\n3. Delete student/faculty.\n4. Update Student/Faculty details.\n5. Activate/deactivate student/faculty.\n6. Exit.\n");
+            printf("1. Add new student.\n2. Add new faculty.\n3. Delete student/faculty.\n4. Update Student/Faculty details.\n5. Activate/deactivate student/faculty.\n6. View user data.\n7. Exit.\n");
             printf("Your choice: ");
             scanf("%d",&choice_num);
             char choice_arr[10];
@@ -121,7 +121,16 @@ int main() {
                     recv(client_socket, buffer, sizeof(buffer), 0);
                     printf("%s\n", buffer);
                 } break;
-                case 6: exit(0);
+                case 6:{
+                    char viewUsername[MAX_BUFFER];
+                    printf("\nEnter username to view details: ");
+                    scanf("%s", viewUsername);
+                    printf("\n");
+                    send(client_socket, viewUsername, sizeof(viewUsername), 0);
+                    recv(client_socket, buffer, sizeof(buffer), 0);
+                    printf("%s", buffer);
+                } break;
+                case 7: exit(0);
                 break;
                 default: exit(0);
                 break;
