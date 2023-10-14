@@ -23,6 +23,7 @@ typedef struct {
     bool activated;
 } User;
 
+//Course structure to store courses.
 typedef struct {
     char courseID[MAX_BUFFER];
     char courseName[MAX_BUFFER];
@@ -31,10 +32,12 @@ typedef struct {
     char students[MAX_STUDENTS][MAX_BUFFER];
 } Course;
 
+//Data sent into thread
 typedef struct {
     int new_socket;
 } ThreadData;
 
+//Function to authenticate user.
 bool authenticate(User* users, int num_users, char* username, char* password, char* role) {
     for (int i = 0; i < num_users; i++) {
         if (strcmp(users[i].username, username) == 0 &&
@@ -483,7 +486,7 @@ void* handleClient(void* data){
             }
         } 
     }
-    // num_users = readUserFile(users, MAX_BUFFER);
+    num_users = readUserFile(users, MAX_BUFFER);
     close(new_socket);
     return NULL;
 }
